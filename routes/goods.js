@@ -59,6 +59,7 @@ router.get("/goods/:goodsId", (req, res) => {
 });
 
 
+
 const Cart = require("../schemas/cart.js")
 router.post("/goods/:goodsId/cart", async(req,res) =>{
   const {goodsId} = req.params;
@@ -117,9 +118,6 @@ router.post("/goods/", async (req,res) => {
 
   res.json({goods:createdGoods});
 })
-
-
-
 
 
 module.exports = router;
