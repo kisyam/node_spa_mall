@@ -38,7 +38,7 @@ connect();
 
 app.use(express.json());
 
-//localhost:3000/apu -> goodRouter
+//localhost:3000/api -> goodRouter
 app.use("/api", [goodsRouter, cartsRouter]); //전역 미들웨어
 
 app.get("/", (req,res) => {
