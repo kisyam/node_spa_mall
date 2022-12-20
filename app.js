@@ -1,10 +1,11 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
+const Joi = require("joi"); //Schema 필드 제약 걸기
+const jwt = require("jsonwebtoken"); // 암호 토큰 생성
 const User = require("./models/user");
 const Goods = require("./models/goods");
 const Cart = require("./models/cart");
-const authMiddleware = require("./middlewares/auth-middleware");
+const authMiddleware = require("./middlewares/auth-middleware"); // 인증 미들웨어(auth)
 
 mongoose.set("strictQuery", true); //mongoose version 7 error handle
 mongoose.connect("mongodb://localhost/shopping-demo", {
@@ -17,49 +18,79 @@ db.on("error", console.error.bind(console, "connection error:"));
 const app = express();
 const router = express.Router();
 
-router.post("/users", async (req, res) => {
-  const { nickname, email, password, confirmpassword } = req.body;
-
-  if (password !== confirmpassword) {
-    res.status(400).send({
-      errorMessage: "패스워드가 일치하지 않습니다.",
-    });
-    return;
-  }
-
-  const existUsers = await User.find({
-    $or: [{ email }, { nickname }],
-  });
-
-  if (existUsers.length > 0) {
-    res.status(400).send({
-      errorMessage: "이미 가입된 이메일 또는 닉네임입니다.",
-    });
-    return;
-  }
-
-  const user = new User({ email, nickname, password });
-  await user.save();
-
-  res.status(200).send({});
+const postUsersSchema = Joi.object({
+  nickname: Joi.string().required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+  confirmPassword: Joi.string().required(),
 });
 
-router.post("/auth", async (req, res) => {
-  const { email, password } = req.body;
+router.post("/users", async (req, res) => {
+  try {
+    const { nickname, email, password, confirmPassword } =
+      await postUsersSchema.validateAsync(req.body);
 
-  const user = await User.findOne({ email, password }).exec();
+    if (password !== confirmPassword) {
+      res.status(400).send({
+        errorMessage: "패스워드가 일치하지 않습니다.",
+      });
+      return;
+    }
 
-  if (!user) {
-    res.status(400).send({
-      errorMessage: "이메일 또는 패스워드가 잘못되었습니다.",
+    const existUsers = await User.find({
+      $or: [{ email }, { nickname }],
     });
-    return;
-  }
 
-  const token = jwt.sign({ userId: user.userId }, "my-secret-key");
-  res.send({
-    token,
-  });
+    if (existUsers.length > 0) {
+      res.status(400).send({
+        errorMessage: "이미 가입된 이메일 또는 닉네임입니다.",
+      });
+      return;
+    }
+
+    const user = new User({ email, nickname, password });
+    await user.save();
+
+    res.status(201).send({});
+
+  } catch (err) {
+    console.log(err);
+    res.status(400).send({
+      errorMessage: "요청한 데이터 형식이 올바르지 않습니다.",
+    });
+  }
+});
+
+
+const postAuthSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
+
+
+router.post("/auth", async (req, res) => {
+  try {
+    const { email, password } = await postAuthSchema.validateAsync(req.body);
+  
+    const user = await User.findOne({ email, password }).exec();
+  
+    if (!user) {
+      res.status(400).send({
+        errorMessage: "이메일 또는 패스워드가 잘못되었습니다.",
+      });
+      return;
+    }
+  
+    const token = jwt.sign({ userId: user.userId }, "my-secret-key");
+    res.send({
+      token,
+    });
+  } catch(err){
+    console.log(err);
+    res.status(400).send({
+      errorMessage:"요청한 데이터 형식이 올바르지 않습니다.",
+    });
+  }
 });
 
 router.get("/users/me", authMiddleware, async (req, res) => {
