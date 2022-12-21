@@ -1,8 +1,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { Op } = require("sequelize");
 const Joi = require("joi"); //Schema 필드 제약 걸기
 const jwt = require("jsonwebtoken"); // 암호 토큰 생성
-const User = require("./models/user");
+const { User } = require("./models");
 const Goods = require("./models/goods");
 const Cart = require("./models/cart");
 const authMiddleware = require("./middlewares/auth-middleware"); // 인증 미들웨어(auth)
@@ -37,8 +38,10 @@ router.post("/users", async (req, res) => {
       return;
     }
 
-    const existUsers = await User.find({
-      $or: [{ email }, { nickname }],
+    const existUsers = await User.findAll({
+      where: {
+        [Op.or]: [{ nickname }, { email }],
+      },
     });
 
     if (existUsers.length > 0) {
@@ -48,11 +51,9 @@ router.post("/users", async (req, res) => {
       return;
     }
 
-    const user = new User({ email, nickname, password });
-    await user.save();
+    await User.create({ email, nickname, password });
 
     res.status(201).send({});
-
   } catch (err) {
     console.log(err);
     res.status(400).send({
@@ -61,34 +62,32 @@ router.post("/users", async (req, res) => {
   }
 });
 
-
 const postAuthSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
 });
 
-
 router.post("/auth", async (req, res) => {
   try {
     const { email, password } = await postAuthSchema.validateAsync(req.body);
-  
-    const user = await User.findOne({ email, password }).exec();
-  
+
+    const user = await User.findOne({ where:{email,password} });
+
     if (!user) {
       res.status(400).send({
         errorMessage: "이메일 또는 패스워드가 잘못되었습니다.",
       });
       return;
     }
-  
+
     const token = jwt.sign({ userId: user.userId }, "my-secret-key");
     res.send({
       token,
     });
-  } catch(err){
+  } catch (err) {
     console.log(err);
     res.status(400).send({
-      errorMessage:"요청한 데이터 형식이 올바르지 않습니다.",
+      errorMessage: "요청한 데이터 형식이 올바르지 않습니다.",
     });
   }
 });
